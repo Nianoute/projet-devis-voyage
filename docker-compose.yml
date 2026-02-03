@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: projet_postgres
+    environment:
+      POSTGRES_DB: projet_db
+      POSTGRES_USER: projet_user
+      POSTGRES_PASSWORD: projet_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - projet_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U projet_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hasura:
+    image: hasura/graphql-engine:latest
+    container_name: projet_hasura
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgresql://projet_user:projet_password@postgres:5432/projet_db
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
+    ports:
+      - "8080:8080"
+    networks:
+      - projet_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: projet_backend
+    depostgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://projet_user:projet_password@postgres:5432/projet_db
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/src:/app/src
+    networks:
+      - projet_network
+    command: >
+      sh -c "
+        npm install &&
+        npx prisma migrate deploy &&
+        npm run start:dev deploy &&
+        npm run start:prod
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: projet_frontend
+    ports:
+      - "4200:4200"
+    networks:
+      - projet_network
+
+volumes:
+  postgres_data:
+
+networks:
+  projet_network:
+    driver: bridge

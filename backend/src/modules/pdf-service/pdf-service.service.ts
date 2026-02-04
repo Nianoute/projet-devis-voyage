@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { SendSmtpEmail, TransactionalEmailsApi, SendSmtpEmailAttachmentInner } from '@getbrevo/brevo';
 import axios from 'axios';
 
 interface QuoteOptions {

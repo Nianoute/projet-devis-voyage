@@ -5,5 +5,197 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("postgresql://hellenic:hellenic@localhost:5432/projet_db?schema=public")
+  url      = "postgresql://hellenic:hellenic@localhost:5432/projet_db?schema=public"
+}
+
+enum PricingModel {
+  FIXED
+  PER_WEEK
+  PAYMENT_IN_3_INSTALLMENTS
+}
+
+enum QuoteStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model Admin {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  password  String
+  is_active Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  apiTokens ApiToken[]
+  documents Document[]
+}
+
+model ApiToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  scope      String
+  expiresAt  DateTime
+  lastUsedAt DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  admin      Admin    @relation(fields: [adminId], references: [id])
+  adminId    Int
+}
+
+model Document {
+  id          Int      @id @default(autoincrement())
+  title       String
+  storagePath String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  admin       Admin    @relation(fields: [adminId], references: [id])
+  adminId     Int
+}
+
+model Vehicle {
+  id               Int               @id @default(autoincrement())
+  brand            String
+  model            String
+  category         String //type de permis, A2 ou A
+  is_active        Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  vehiclePrices    VehiclePrice[]
+  selectedVehicles SelectedVehicle[]
+}
+
+//établit le prix d'un véhicule selon le temps de location
+model VehiclePrice {
+  id                Int      @id @default(autoincrement())
+  vehicleId         Int
+  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id])
+  price_per_day     Float
+  min_duration_days Int?
+  is_active         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Formula {
+  id                    Int                    @id @default(autoincrement())
+  name                  String
+  description           String?
+  is_active             Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  availableTripFormulas AvailableTripFormula[]
+}
+
+//Permet de définir les formules disponibles pour un voyage
+model AvailableTripFormula {
+  id            Int            @id @default(autoincrement())
+  tripId        Int
+  trip          Trip           @relation(fields: [tripId], references: [id])
+  formulaId     Int
+  formula       Formula        @relation(fields: [formulaId], references: [id])
+  is_active     Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  quoteRequests QuoteRequest[]
+}
+
+model Trip {
+  id                    Int                    @id @default(autoincrement())
+  title                 String
+  description           String?
+  capacity              Int?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  availableTripFormulas AvailableTripFormula[]
+  tripPrices            TripPrice[]
+}
+
+model TripPrice {
+  id        Int     @id @default(autoincrement())
+  tripId    Int
+  trip      Trip    @relation(fields: [tripId], references: [id])
+  price     Float
+  periodId  Int
+  period    Period  @relation(fields: [periodId], references: [id])
+  is_active Boolean @default(true)
+}
+
+model Period {
+  id           Int           @id @default(autoincrement())
+  startDate    DateTime
+  endDate      DateTime
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tripPrices   TripPrice[]
+  optionPrices OptionPrice[]
+}
+
+model Option {
+  id           Int           @id @default(autoincrement())
+  name         String
+  description  String
+  pricingModel PricingModel
+  optionTypeId Int
+  optionType   OptionType    @relation(fields: [optionTypeId], references: [id])
+  is_active    Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  optionPrices OptionPrice[]
+  quoteOptions QuoteOption[]
+}
+
+model OptionPrice {
+  id        Int     @id @default(autoincrement())
+  optionId  Int
+  option    Option  @relation(fields: [optionId], references: [id])
+  price     Float
+  periodId  Int
+  period    Period  @relation(fields: [periodId], references: [id])
+  is_active Boolean @default(true)
+}
+
+model OptionType {
+  id        Int      @id @default(autoincrement())
+  label     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  options   Option[]
+}
+
+model QuoteRequest {
+  id                     Int                  @id @default(autoincrement())
+  availableTripFormulaId Int
+  availableTripFormula   AvailableTripFormula @relation(fields: [availableTripFormulaId], references: [id])
+  name                   String
+  lastName               String
+  email                  String
+  phone                  String
+  message                String?
+  status                 QuoteStatus
+  startDate              DateTime
+  endDate                DateTime
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  quoteOptions           QuoteOption[]
+  selectedVehicles       SelectedVehicle[]
+}
+
+model QuoteOption {
+  id             Int          @id @default(autoincrement())
+  optionId       Int
+  option         Option       @relation(fields: [optionId], references: [id])
+  quoteRequestId Int
+  quoteRequest   QuoteRequest @relation(fields: [quoteRequestId], references: [id])
+  quantity       Int
+}
+
+model SelectedVehicle {
+  id             Int          @id @default(autoincrement())
+  quoteRequestId Int
+  quoteRequest   QuoteRequest @relation(fields: [quoteRequestId], references: [id])
+  vehicleId      Int
+  vehicle        Vehicle      @relation(fields: [vehicleId], references: [id])
+  quantity       Int
 }

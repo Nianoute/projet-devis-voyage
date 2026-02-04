@@ -1,74 +1,83 @@
 services:
-  postgres:
-    image: postgres:15
-    container_name: projet_postgres
-    environment:
-      POSTGRES_DB: projet_db
-      POSTGRES_USER: projet_user
-      POSTGRES_PASSWORD: projet_password
+  backend:
+    container_name: hellenic-backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.dev
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - projet_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U projet_user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  hasura:
-    image: hasura/graphql-engine:latest
-    container_name: projet_hasura
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Connexion à Postgres via le nom du service (host=postgres en Docker)
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/hellenic?schema=public
+      # Polling pour détecter les changements de fichiers (nécessaire sur Windows/Mac avec Docker)
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      HASURA_GRAPHQL_DATABASE_URL: postgresql://projet_user:projet_password@postgres:5432/projet_db
-      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
-      HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
-    ports:
-      - "8080:8080"
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app  
+        - action: rebuild
+          path: ./backend/package*.json
+        - action: rebuild
+          path: ./.env
     networks:
-      - projet_network
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: projet_backend
-    depostgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://projet_user:projet_password@postgres:5432/projet_db
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backend/src:/app/src
-    networks:
-      - projet_network
-    command: >
-      sh -c "
-        npm install &&
-        npx prisma migrate deploy &&
-        npm run start:dev deploy &&
-        npm run start:prod
-      "
+      - hellenic-network
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: projet_frontend
+      dockerfile: Dockerfile.dev
+    container_name: hellenic-frontend
     ports:
       - "4200:4200"
+    volumes:
+      # Monte le code source pour que les changements déclenchent le hot reload
+      - ./frontend:/app
+      # Garde les node_modules du container (évite d'écraser avec ceux de l'hôte)
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      # Polling pour détecter les changements de fichiers (nécessaire sur Windows/Mac avec Docker)
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    develop:
+      watch:
+        # Pas de sync : le volume ./frontend:/app monte déjà le code
+        - path: ./frontend/package.json
+          action: rebuild
+        - path: ./frontend/package-lock.json
+          action: rebuild
+        - path: ./.env
+          action: rebuild
     networks:
-      - projet_network
+      - hellenic-network
 
-volumes:
-  postgres_data:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hellenic-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: projet_db
+    volumes:
+      - ./dockerdata/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d projet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hellenic-network
+
+  # hasura:
 
 networks:
-  projet_network:
+  hellenic-network:
     driver: bridge

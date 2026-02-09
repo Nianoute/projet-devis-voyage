@@ -12,9 +12,9 @@ docker compose up -d
 docker compose watch
 ```
 
-- **Backend** : http://localhost:3000  
-- **Frontend** : http://localhost:4200  
-- **Postgres** : localhost:5432  
+- **Backend** : http://localhost:3000
+- **Frontend** : http://localhost:4200
+- **Postgres** : localhost:5432
 
 ---
 
@@ -47,3 +47,11 @@ npx prisma studio --url database_url
 ```
 
 Les migrations sont créées dans `backend/prisma/migrations/` et s’appliquent à la base Postgres du conteneur.
+
+# Seed
+
+Pour générer les données mocké, tapez la commande suivante :
+
+```bash
+npm run prisma:seed
+```
